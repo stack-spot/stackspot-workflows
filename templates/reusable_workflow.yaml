@@ -1,0 +1,131 @@
+on:  
+  workflow_call:
+    inputs:
+      runner_group:
+        required: true
+        type: string
+      terraform-version:
+        default: 1.1.9
+        description: The version of the Terraform CLI.
+        required: false
+      working-directory:
+        description: The folder with the Terraform files.
+        required: true
+    secrets:
+      AWS_ACCOUNT_ID_SANDBOX:
+        required: true
+      AWS_REGION_SANDBOX:
+        required: true
+      GIT_PIPE_TOKEN:
+        required: true
+      INFRACOST_API_KEY:
+        required: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.1.9
+      - name: Run terraform fmt check
+        run: terraform fmt -check -diff -recursive
+
+  secrets:
+    name: Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Checks if the .gitignore file exists
+        run: ls .gitignore
+      - name: Run secrets scan
+        env:
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        uses: GitGuardian/ggshield-action@master
+        with:
+          args: --verbose --all-policies
+  
+  cost_projection:
+    runs-on: {{ runner_group }}
+    name: Show cost projection
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: 1.1.9
+    - name: Initialize Terraform
+      run: |
+        cd terraform/
+        terraform init -input=false
+      env:
+        AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}
+    - name: Plan Terraform
+      id: plan
+      continue-on-error: true
+      run: terraform plan -out plan.tfplan
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}
+    
+    - name: Terraform show
+      id: show
+      run: terraform show -json plan.tfplan
+      working-directory: ${{ inputs.working-directory }}
+    
+    - name: Save Plan JSON
+      run: echo '${{ steps.show.outputs.stdout }}' > plan.json
+    
+    - name: Run infracost diff
+      if: ${{ github.event_name == 'pull_request' }}
+      uses: infracost/infracost-gh-action@master
+      env:
+        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GIT_PIPE_TOKEN }}
+      with:
+        entrypoint: /scripts/ci/diff.sh
+        path: .
+        usage_file: infracost-usage.yml
+
+  plan:
+    name: Plan
+    runs-on: {{ runner_group }}
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.1.9
+      - name: Initialize Terraform
+        run: |
+          cd terraform/
+          terraform init -input=false 
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}         
+      - name: Plan Terraform
+        id: plan
+        run: |
+          cd terraform/
+          terraform plan -input=false -no-color
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}
+
