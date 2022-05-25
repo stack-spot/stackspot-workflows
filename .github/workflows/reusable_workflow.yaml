@@ -99,10 +99,10 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - name: Check out code
         uses: actions/checkout@v2
       - name: Setup Terraform
