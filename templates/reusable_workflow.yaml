@@ -4,17 +4,22 @@ on:
       runner_group:
         required: true
         type: string
-      terraform-version:
+      terraform_version:
         default: 1.1.9
         description: The version of the Terraform CLI.
         required: false
-      working-directory:
+      working_directory:
         description: The folder with the Terraform files.
         required: true
-    secrets:
-      AWS_ACCOUNT_ID_SANDBOX:
+      github_event_name:
+        type: string
         required: true
-      AWS_REGION_SANDBOX:
+      tag:
+        type: string
+    secrets:
+      AWS_ACCOUNT_ID:
+        required: true
+      AWS_REGION:
         required: true
       GIT_PIPE_TOKEN:
         required: true
@@ -31,9 +36,9 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: 1.1.9
+          terraform_version: {{ terraform_version }}
       - name: Run terraform fmt check
-        run: terraform fmt -check -diff -recursive
+        run: terraform fmt -check -diff -recursive 
 
   secrets:
     name: Secrets
@@ -65,33 +70,35 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
       with:
-        terraform_version: 1.1.9
+        terraform_version: {{ terraform_version }}
     - name: Initialize Terraform
       run: |
         cd terraform/
         terraform init -input=false
       env:
-        AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
-        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT }}
     - name: Plan Terraform
       id: plan
       continue-on-error: true
       run: terraform plan -out plan.tfplan
-      working-directory: ${{ inputs.working-directory }}
+      working_directory: ${{ inputs.{{ working_directory }} }}
       env:
-        AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
-        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}
-    
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+
     - name: Terraform show
       id: show
       run: terraform show -json plan.tfplan
-      working-directory: ${{ inputs.working-directory }}
+      working_directory: ${{ inputs.{{ working_directory }} }}
     
     - name: Save Plan JSON
       run: echo '${{ steps.show.outputs.stdout }}' > plan.json
     
     - name: Run infracost diff
-      if: ${{ github.event_name == 'pull_request' }}
+      if: ${{ github_event_name == 'pull_request' }}
       uses: infracost/infracost-gh-action@master
       env:
         INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
@@ -112,20 +119,21 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: 1.1.9
+          terraform_version: {{ terraform_version }}
       - name: Initialize Terraform
         run: |
           cd terraform/
           terraform init -input=false 
         env:
           AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
-          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}         
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}         
       - name: Plan Terraform
         id: plan
         run: |
           cd terraform/
           terraform plan -input=false -no-color
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION_SANDBOX }}
-          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID_SANDBOX }}
-
+      env:
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
