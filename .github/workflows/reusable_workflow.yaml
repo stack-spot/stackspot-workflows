@@ -44,7 +44,7 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
   
   cost_projection:
-    runs-on: {{ runner_group }}
+    runs-on: ${{ inputs.runner_group }}
     name: Show cost projection
     steps:
     - name: Check out repository
@@ -52,7 +52,7 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
       with:
-        terraform_version: ${{ terraform_version }}
+        terraform_version: ${{ inputs.terraform_version }}
     - name: Initialize Terraform
       run: terraform init -input=false
       working-directory: ${{ inputs.working_directory }}
@@ -91,7 +91,7 @@ jobs:
 
   plan:
     name: Plan
-    runs-on: {{ runner_group }}
+    runs-on: ${{ inputs.runner_group }}
     strategy:
       fail-fast: false
     steps:
