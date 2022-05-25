@@ -1,0 +1,117 @@
+on:  
+  workflow_call:
+    inputs:
+      runner_group:
+        required: true
+        type: string
+      terraform_version:
+        default: 1.1.9
+        description: The version of the Terraform CLI.
+        required: false
+      working_directory:
+        description: The folder with the Terraform files.
+        required: true
+      github_event_name:
+        type: string
+        required: true
+      tag:
+        type: string
+    secrets:
+      AWS_ACCOUNT_ID:
+        required: true
+      AWS_REGION:
+        required: true
+      GIT_PIPE_TOKEN:
+        required: true
+      INFRACOST_API_KEY:
+        required: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: {{ terraform_version }}
+      - name: Run terraform fmt check
+        run: terraform fmt -check -diff -recursive
+        working_directory: {{ working_directory }}
+  
+  cost_projection:
+    runs-on: {{ runner_group }}
+    name: Show cost projection
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: {{ terraform_version }}
+    - name: Initialize Terraform
+      run: terraform init -input=false
+      working_directory: {{ working_directory }}
+      env:
+        AWS_REGION: {{ AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+    - name: Plan Terraform
+      id: plan
+      continue-on-error: true
+      run: terraform plan -out plan.tfplan
+      working_directory: {{ working_directory }}
+      env:
+        AWS_REGION: {{ AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+
+    - name: Terraform show
+      id: show
+      run: terraform show -json plan.tfplan
+      working_directory: {{ working_directory }}
+    
+    - name: Save Plan JSON
+      run: echo '${{ steps.show.outputs.stdout }}' > plan.json
+    
+    - name: Run infracost diff
+      if: {{ github_event_name }}
+      uses: infracost/infracost-gh-action@master
+      env:
+        INFRACOST_API_KEY: {{ INFRACOST_API_KEY }}
+        GITHUB_TOKEN: {{ GIT_PIPE_TOKEN }}
+      with:
+        entrypoint: /scripts/ci/diff.sh
+        path: .
+        usage_file: infracost-usage.yml
+
+  plan:
+    name: Plan
+    runs-on: {{ runner_group }}
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: {{ terraform_version }}
+      - name: Initialize Terraform
+        run: |
+          cd terraform/
+          terraform init -input=false 
+        env:
+          AWS_REGION: {{ AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}   
+      - name: Plan Terraform
+        id: plan
+        run: terraform plan -input=false -no-color
+        working_directory: {{ working_directory }}
+        env:
+          AWS_REGION: {{ AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}
