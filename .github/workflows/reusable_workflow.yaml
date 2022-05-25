@@ -5,10 +5,12 @@ on:
         required: true
         type: string
       terraform_version:
+        type: string
         default: 1.1.9
         description: The version of the Terraform CLI.
         required: false
       working_directory:
+        type: string
         description: The folder with the Terraform files.
         required: true
       github_event_name:
@@ -36,10 +38,10 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: {{ terraform_version }}
+          terraform_version: ${{ inputs.terraform_version }}
       - name: Run terraform fmt check
         run: terraform fmt -check -diff -recursive
-        working_directory: {{ working_directory }}
+        working-directory: ${{ inputs.working_directory }}
   
   cost_projection:
     runs-on: {{ runner_group }}
@@ -50,38 +52,38 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
       with:
-        terraform_version: {{ terraform_version }}
+        terraform_version: ${{ terraform_version }}
     - name: Initialize Terraform
       run: terraform init -input=false
-      working_directory: {{ working_directory }}
+      working-directory: ${{ inputs.working_directory }}
       env:
-        AWS_REGION: {{ AWS_REGION }}
-        AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
-        AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
     - name: Plan Terraform
       id: plan
       continue-on-error: true
       run: terraform plan -out plan.tfplan
-      working_directory: {{ working_directory }}
+      working-directory: ${{ inputs.working_directory }}
       env:
-        AWS_REGION: {{ AWS_REGION }}
-        AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
-        AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
 
     - name: Terraform show
       id: show
       run: terraform show -json plan.tfplan
-      working_directory: {{ working_directory }}
+      working-directory: ${{ inputs.working_directory }}
     
     - name: Save Plan JSON
       run: echo '${{ steps.show.outputs.stdout }}' > plan.json
     
     - name: Run infracost diff
-      if: {{ github_event_name }}
+      if: ${{ inputs.github_event_name }}
       uses: infracost/infracost-gh-action@master
       env:
-        INFRACOST_API_KEY: {{ INFRACOST_API_KEY }}
-        GITHUB_TOKEN: {{ GIT_PIPE_TOKEN }}
+        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GIT_PIPE_TOKEN }}
       with:
         entrypoint: /scripts/ci/diff.sh
         path: .
@@ -98,19 +100,19 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: {{ terraform_version }}
+          terraform_version: ${{ inputs.terraform_version }}
       - name: Initialize Terraform
         run: terraform init -input=false 
-        working_directory: {{ working_directory }}
+        working-directory: ${{ inputs.working_directory }}
         env:
-          AWS_REGION: {{ AWS_REGION }}
-          AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
-          AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}   
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}   
       - name: Plan Terraform
         id: plan
         run: terraform plan -input=false -no-color
-        working_directory: {{ working_directory }}
+        working-directory: ${{ inputs.working_directory }}
         env:
-          AWS_REGION: {{ AWS_REGION }}
-          AWS_DEFAULT_ACCOUNT: {{ AWS_ACCOUNT_ID }}
-          AWS_TARGET_ACCOUNT: {{ AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
