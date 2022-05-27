@@ -53,10 +53,6 @@ jobs:
         node-version: 16
     - name: Check out repository
       uses: actions/checkout@v2
-    - name: Configure AWS credentials from Test account
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-region: ${{ secrets.AWS_REGION }}
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
       with:
@@ -68,7 +64,7 @@ jobs:
         AWS_REGION: ${{ secrets.AWS_REGION }}
         AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
         AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-    - name: Plan Terraform
+    - name: Terraform Plan
       id: plan
       continue-on-error: true
       run: terraform plan -out plan.tfplan
@@ -78,7 +74,7 @@ jobs:
         AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
         AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
 
-    - name: Terraform show
+    - name: Terraform Show
       id: show
       run: terraform show -json plan.tfplan
       working-directory: ${{ inputs.working_directory }}
@@ -87,7 +83,7 @@ jobs:
       run: echo '${{ steps.show.outputs.stdout }}' > plan.json
     
     - name: Run infracost diff
-      if: ${{ inputs.github_event_name }}
+      if: ${{ inputs.github_event_name }} == 'pull_request'
       uses: infracost/infracost-gh-action@master
       env:
         INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
@@ -98,7 +94,40 @@ jobs:
         usage_file: infracost-usage.yml
 
   plan:
-    name: Plan
+    name: Planning
+    runs-on: ${{ inputs.runner_group }}
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+      - name: Initialize Terraform
+        run: terraform init -input=false 
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}   
+      - name: Plan Terraform
+        id: plan
+        run: terraform plan -input=false -no-color
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+  
+  apply:
+    name: Deployment
+    needs: plan
     runs-on: ${{ inputs.runner_group }}
     strategy:
       fail-fast: false

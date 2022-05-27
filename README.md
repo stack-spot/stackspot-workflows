@@ -27,7 +27,7 @@ on:
       - 'branch name'
 jobs:
   call-reusable-workflow:    
-    uses: stack-spot/stackspot-workflows/.github/workflows/reusable_workflow.yaml@5c5e0e05729332f624c396dd221c5fba2e685693
+    uses: stack-spot/stackspot-workflows/.github/workflows/terraform.yaml@5c5e0e05729332f624c396dd221c5fba2e685693 ###ref example
     with:
       runner_group: runner-group-name
       working_directory: terraform/
