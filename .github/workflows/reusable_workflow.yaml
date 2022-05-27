@@ -46,57 +46,43 @@ jobs:
   cost_projection:
     runs-on: ${{ inputs.runner_group }}
     name: Show cost projection
-    steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16
-    - name: Check out repository
-      uses: actions/checkout@v2
-    - name: Configure AWS credentials from Test account
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-region: ${{ secrets.AWS_REGION }}
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version: ${{ inputs.terraform_version }}
-    - name: Initialize Terraform
-      run: terraform init -input=false
-      working-directory: ${{ inputs.working_directory }}
-      env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-    - name: Plan Terraform
-      id: plan
-      continue-on-error: true
-      run: terraform plan -out plan.tfplan
-      working-directory: ${{ inputs.working_directory }}
-      env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-
-    - name: Terraform show
-      id: show
-      run: terraform show -json plan.tfplan
-      working-directory: ${{ inputs.working_directory }}
-    
-    - name: Save Plan JSON
-      run: echo '${{ steps.show.outputs.stdout }}' > plan.json
-    
-    - name: Run infracost diff
-      if: ${{ inputs.github_event_name }}
-      uses: infracost/infracost-gh-action@master
-      env:
-        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-        GITHUB_TOKEN: ${{ secrets.GIT_PIPE_TOKEN }}
-      with:
-        entrypoint: /scripts/ci/diff.sh
-        path: .
-        usage_file: infracost-usage.yml
-
+    env:
+      TF_ROOT: ${{ inputs.working_directory }}
+    steps:           
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v2
+        # See https://github.com/infracost/actions/tree/master/setup for other inputs
+        # If you can't use this action, see Docker images in https://infracost.io/cicd
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+      # Checkout the base branch of the pull request (e.g. main/master).
+      - name: Checkout base branch
+        uses: actions/checkout@v2
+        with:
+          ref: '${{ github.event.pull_request.base.ref }}'
+      # Generate Infracost JSON file as the baseline.
+      - name: Generate Infracost cost estimate baseline
+        run: |
+          infracost breakdown --path=${TF_ROOT} \
+                              --format=json \
+                              --out-file=/tmp/infracost-base.json
+      # Checkout the current PR branch so we can create a diff.
+      - name: Checkout PR branch
+        uses: actions/checkout@v2
+      # Generate an Infracost diff and save it to a JSON file.
+      - name: Generate Infracost diff
+        run: |
+          infracost diff --path=${TF_ROOT} \
+                         --format=json \
+                         --compare-to=/tmp/infracost-base.json \
+                         --out-file=/tmp/infracost.json
+      - name: Post Infracost comment
+        run: |
+            infracost comment github --path=/tmp/infracost.json \
+                                     --repo=$GITHUB_REPOSITORY \
+                                     --github-token=${{github.token}} \
+                                     --pull-request=${{github.event.pull_request.number}} \
+                                     --behavior=update
   plan:
     name: Plan
     runs-on: ${{ inputs.runner_group }}
