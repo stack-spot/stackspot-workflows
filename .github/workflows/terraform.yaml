@@ -142,21 +142,21 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: ${{ inputs.terraform_version }}
-      - name: Configure backend
-        id: backend
-        working-directory: ${{ inputs.working_directory }}
-        run: |
-          cat > backend.tf << EOF
-          terraform {
-            backend "remote" {
-              organization = "${{secrets.AWS_ACCOUNT_ID}}"
-        
-              workspaces {
-                name = "${{github.event.repository.name}}-reusable-workflow"
-              }
-            }
-          }
-          EOF
+#      - name: Configure backend
+#        id: backend
+#        working-directory: ${{ inputs.working_directory }}
+#        run: |
+#          cat > backend.tf << EOF
+#          terraform {
+#            backend "remote" {
+#              organization = "${{secrets.AWS_ACCOUNT_ID}}"
+#        
+#              workspaces {
+#                name = "${{github.event.repository.name}-reusable-workflow"
+#              }
+#            }
+#          }
+#          EOF
       - name: Initialize Terraform
         run: terraform init -input=false 
         working-directory: ${{ inputs.working_directory }}
