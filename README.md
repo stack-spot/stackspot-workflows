@@ -43,8 +43,6 @@ jobs:
 
 ### Parameters
 
-
-|-------------------|------------------------------------------------|
 |parameter          |description                                     |
 |-------------------|------------------------------------------------|
 | runner_group      | The name of the Self hosted Runner group       |
@@ -53,7 +51,6 @@ jobs:
 | AWS_REGION        | The region where the resources will be applied |
 | GIT_PIPE_TOKEN    | Github token for the workflow                  |
 | INFRACOST_API_KEY | The API Key of the Infracost which will be used|
-|-------------------|------------------------------------------------|
 
 ## Support
 
