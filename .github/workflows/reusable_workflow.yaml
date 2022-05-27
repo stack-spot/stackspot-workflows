@@ -46,8 +46,12 @@ jobs:
   cost_projection:
     runs-on: ${{ inputs.runner_group }}
     name: Show cost projection
+    if: ${{ inputs.github_event_name }} == 'pull_request'
     env:
       TF_ROOT: ${{ inputs.working_directory }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }} 
     steps:           
       - name: Setup Infracost
         uses: infracost/actions/setup@v2
