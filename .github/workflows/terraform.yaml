@@ -32,7 +32,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -81,7 +80,6 @@ jobs:
         with:
           name: plan.tfplan
           path: /tmp/plan.tfplan
-        working-directory: ${{ inputs.working_directory }}
 
   cost_projection:
     runs-on: ${{ inputs.runner_group }}
@@ -102,7 +100,6 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: plan.tfplan
-        working-directory: ${{ inputs.working_directory }}
       - name: Initialize Terraform
         run: terraform init -input=false
         working-directory: ${{ inputs.working_directory }}
