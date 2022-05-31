@@ -49,33 +49,33 @@ jobs:
     strategy:
       fail-fast: false
     if: github.event_name == 'pull_request'
-    steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16
-    - name: Check out code
-      uses: actions/checkout@v2
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version: ${{ inputs.terraform_version }}
-    - name: Initialize Terraform
-    run: terraform init -input=false
-    working-directory: ${{ inputs.working_directory }}
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-    - name: Terraform Plan
-      id: plan
-      continue-on-error: true
-      run: terraform plan -out plan.tfplan
+      steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+      - name: Initialize Terraform
+      run: terraform init -input=false
       working-directory: ${{ inputs.working_directory }}
       env:
         AWS_REGION: ${{ secrets.AWS_REGION }}
         AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
         AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+      - name: Terraform Plan
+        id: plan
+        continue-on-error: true
+        run: terraform plan -out plan.tfplan
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
 
   cost_projection:
     runs-on: ${{ inputs.runner_group }}
