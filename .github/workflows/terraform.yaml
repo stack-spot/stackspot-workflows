@@ -90,42 +90,31 @@ jobs:
           node-version: 16
       - name: Check out repository
         uses: actions/checkout@v2
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v2
         with:
-          terraform_version: ${{ inputs.terraform_version }}
-      - name: Initialize Terraform
-        run: terraform init -input=false
-        working-directory: ${{ inputs.working_directory }}
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-      - name: Terraform Plan
-        id: plan
-        continue-on-error: true
-        run: terraform plan -out plan.tfplan
-        working-directory: ${{ inputs.working_directory }}
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-      - name: Terraform Show
-        id: show
-        run: terraform show -json plan.tfplan
-        working-directory: ${{ inputs.working_directory }}
-      - name: Save Plan JSON
-        run: echo '${{ steps.show.outputs.stdout }}' > plan.json
-      - name: Run infracost diff
-        uses: infracost/infracost-gh-action@master
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GIT_PIPE_TOKEN }}
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+      - name: Checkout base branch
+        uses: actions/checkout@v2
         with:
-          entrypoint: /scripts/ci/diff.sh
-          path: .
-          usage_file: infracost-usage.yml
-  
+          ref: '${{ github.event.pull_request.base.ref }}'
+      - name: Generate Infracost cost estimate baseline
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          infracost breakdown --path=./ \
+                              --format=json \
+                              --out-file=/tmp/infracost-base.json
+      - name: Checkout PR branch
+        uses: actions/checkout@v2
+      - name: Run Infracost
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          infracost diff --path=./ \
+                        --format=json \
+                        --compare-to=/tmp/infracost-base.json \
+                        --out-file=/tmp/infracost.json
+      
+      
   apply:
     name: Deployment
     runs-on: ${{ inputs.runner_group }}
