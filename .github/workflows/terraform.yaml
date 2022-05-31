@@ -79,6 +79,7 @@ jobs:
   cost_projection:
     runs-on: ${{ inputs.runner_group }}
     name: Show cost projection
+    needs: plan
     if: github.event_name == 'pull_request'
     steps:
     - name: Setup Node.js
@@ -109,7 +110,6 @@ jobs:
   
   apply:
     name: Deployment
-    needs: plan
     runs-on: ${{ inputs.runner_group }}
     strategy:
       fail-fast: false
