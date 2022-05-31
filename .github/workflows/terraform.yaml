@@ -42,62 +42,13 @@ jobs:
       - name: Run terraform fmt check
         run: terraform fmt -check -diff -recursive
         working-directory: ${{ inputs.working_directory }}
-  
-  cost_projection:
-    runs-on: ${{ inputs.runner_group }}
-    name: Show cost projection
-    steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16
-    - name: Check out repository
-      uses: actions/checkout@v2
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_version: ${{ inputs.terraform_version }}
-    - name: Initialize Terraform
-      run: terraform init -input=false
-      working-directory: ${{ inputs.working_directory }}
-      env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-    - name: Terraform Plan
-      id: plan
-      continue-on-error: true
-      run: terraform plan -out plan.tfplan
-      working-directory: ${{ inputs.working_directory }}
-      env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-        AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-
-    - name: Terraform Show
-      id: show
-      run: terraform show -json plan.tfplan
-      working-directory: ${{ inputs.working_directory }}
-    
-    - name: Save Plan JSON
-      run: echo '${{ steps.show.outputs.stdout }}' > plan.json
-    
-    - name: Run infracost diff
-      if: github.event_name == 'pull_request'
-      uses: infracost/infracost-gh-action@master
-      env:
-        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-        GITHUB_TOKEN: ${{ secrets.GIT_PIPE_TOKEN }}
-      with:
-        entrypoint: /scripts/ci/diff.sh
-        path: .
-        usage_file: infracost-usage.yml
 
   plan:
     name: Planning
     runs-on: ${{ inputs.runner_group }}
     strategy:
       fail-fast: false
+    if: github.event_name == 'pull_request'
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -110,12 +61,12 @@ jobs:
         with:
           terraform_version: ${{ inputs.terraform_version }}
       - name: Initialize Terraform
-        run: terraform init -input=false 
+        run: terraform init -input=false
         working-directory: ${{ inputs.working_directory }}
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}   
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }} 
       - name: Plan Terraform
         id: plan
         run: terraform plan -input=false -no-color
@@ -124,6 +75,37 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+
+  cost_projection:
+    runs-on: ${{ inputs.runner_group }}
+    name: Show cost projection
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+    - name: Terraform Show
+      id: show
+      run: terraform show -json plan.tfplan
+      working-directory: ${{ inputs.working_directory }}
+    - name: Save Plan JSON
+      run: echo '${{ steps.show.outputs.stdout }}' > plan.json
+    - name: Run infracost diff
+      uses: infracost/infracost-gh-action@master
+      env:
+        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GIT_PIPE_TOKEN }}
+      with:
+        entrypoint: /scripts/ci/diff.sh
+        path: .
+        usage_file: infracost-usage.yml
   
   apply:
     name: Deployment
@@ -131,6 +113,7 @@ jobs:
     runs-on: ${{ inputs.runner_group }}
     strategy:
       fail-fast: false
+    if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -142,21 +125,6 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: ${{ inputs.terraform_version }}
-#      - name: Configure backend
-#        id: backend
-#        working-directory: ${{ inputs.working_directory }}
-#        run: |
-#          cat > backend.tf << EOF
-#          terraform {
-#            backend "remote" {
-#              organization = "${{secrets.AWS_ACCOUNT_ID}}"
-#        
-#              workspaces {
-#                name = "${{github.event.repository.name}-reusable-workflow"
-#              }
-#            }
-#          }
-#          EOF
       - name: Initialize Terraform
         run: terraform init -input=false 
         working-directory: ${{ inputs.working_directory }}
@@ -168,16 +136,26 @@ jobs:
         run: terraform validate
         working-directory: ${{ inputs.working-directory }}
         shell: bash
-      - name: Plan Terraform
+      - name: Terraform Plan
         id: plan
-        run: terraform plan -input=false -lock-timeout=30m -out=plan
+        continue-on-error: true
+        run: terraform plan -out plan.tfplan
         working-directory: ${{ inputs.working_directory }}
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+      - name: Terraform Show
+      id: show
+      run: terraform show -json plan.tfplan
+      working-directory: ${{ inputs.working_directory }}
+      - name: Save Plan JSON
+        run: echo '${{ steps.show.outputs.stdout }}' > ./plan.json
       - name: Apply
-        run: terraform apply -auto-approve -input=false -lock-timeout=30m plan
-        if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        run: terraform apply -auto-approve -input=false -lock-timeout=30m ./plan.json
         working-directory: ${{ inputs.working-directory }}
         shell: bash
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
