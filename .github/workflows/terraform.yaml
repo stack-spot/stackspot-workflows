@@ -187,3 +187,42 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+      - name: Post Plan and Apply to GitHub PR
+        if: steps.plan.outcome == 'success' && steps.apply.outcome == 'success'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{secrets.GIT_PIPE_TOKEN}}
+          message: |
+            Applying:
+
+            ```diff
+            ${{ env.PLAN }}
+            ```
+
+            ```
+            ${{ steps.apply.outputs.stdout }}
+            ```            
+
+      - name: Post Plan Failure
+        if: steps.plan.outcome == 'failure'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{secrets.GIT_PIPE_TOKEN}}
+          message: |
+            Plan failed:
+
+            ```
+            ${{ steps.plan.outputs.stderr }}
+            ```            
+
+      - name: Post Apply Failure
+        if: steps.apply.outcome == 'failure'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          message: |
+            Apply failed:
+
+            ```
+            ${{ steps.apply.outputs.stderr }}
+            ```
