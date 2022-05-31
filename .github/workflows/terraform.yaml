@@ -146,9 +146,9 @@ jobs:
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
       - name: Terraform Show
-      id: show
-      run: terraform show -json plan.tfplan
-      working-directory: ${{ inputs.working_directory }}
+        id: show
+        run: terraform show -json plan.tfplan
+        working-directory: ${{ inputs.working_directory }}
       - name: Save Plan JSON
         run: echo '${{ steps.show.outputs.stdout }}' > ./plan.json
       - name: Apply
