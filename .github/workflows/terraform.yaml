@@ -156,7 +156,7 @@ jobs:
         shell: bash
       
       - name: Apply
-        run: terraform plan -out plan | terraform apply -auto-approve -input=false -lock-timeout=30m "plan"
+        run: terraform plan | terraform apply -auto-approve -input=false -lock-timeout=30m
         working-directory: ${{ inputs.working-directory }}
         shell: bash
         env:
