@@ -150,14 +150,39 @@ jobs:
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }} 
       - name: Validate
         run: terraform validate
-        working-directory: ${{ inputs.working-directory }}
+        working-directory: ${{ inputs.working_directory }}
+      - name: Plan Terraform
+        id: plan
+        working-directory: ${{ inputs.working_directory }}
+        continue-on-error: true
+        run: |
+          terraform plan -input=false -no-color -out=tfplan \
+          && terraform show -no-color tfplan
+      - name: Reformat Plan
+        if: steps.plan.outcome == 'success'
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          echo '${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}' \
+          | sed -E 's/^([[:space:]]+)([-+])/\2\1/g' > plan.txt          
+
+      - name: Put Plan in Env Var
+        if: steps.plan.outcome == 'success'
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          PLAN=$(cat plan.txt)
+          echo "PLAN<<EOF" >> $GITHUB_ENV
+          echo "$PLAN" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       
-      - name: Apply
-        run: | 
-          echo `${GITHUB_WORKSPACE}`
-          terraform plan
-          terraform apply -auto-approve -input=false -lock-timeout=30m
-        working-directory: ${{ inputs.working-directory }}
+      - name: Apply Terraform
+        if: steps.plan.outcome == 'success'
+        id: apply
+        continue-on-error: true
+        working-directory: ${{ inputs.working_directory }}
+        run: |
+          terraform apply -input=false -auto-approve -lock-timeout=30m \
+            -no-color \
+            tfplan
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
