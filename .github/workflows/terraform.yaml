@@ -156,21 +156,15 @@ jobs:
         shell: bash
       - name: Terraform Plan
         id: plan
-        continue-on-error: true
-        run: terraform plan -out plan.tfplan
+        continue-on-error: false
+        run: terraform plan -out plan
         working-directory: ${{ inputs.working_directory }}
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-      - name: Terraform Show
-        id: show
-        run: terraform show -json plan.tfplan
-        working-directory: ${{ inputs.working_directory }}
-      - name: Save Plan JSON
-        run: echo '${{ steps.show.outputs.stdout }}' > ./plan.json
       - name: Apply
-        run: terraform apply -auto-approve -input=false -lock-timeout=30m ./plan.json
+        run: terraform apply -auto-approve -input=false -lock-timeout=30m plan
         working-directory: ${{ inputs.working-directory }}
         shell: bash
         env:
