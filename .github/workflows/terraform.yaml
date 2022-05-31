@@ -164,7 +164,7 @@ jobs:
           AWS_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_TARGET_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
       - name: Apply
-        run: terraform apply -auto-approve -input=false -lock-timeout=30m plan
+        run: terraform apply -auto-approve -input=false -lock-timeout=30m "plan"
         working-directory: ${{ inputs.working-directory }}
         shell: bash
         env:
