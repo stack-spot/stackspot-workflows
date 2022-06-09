@@ -121,8 +121,7 @@ jobs:
                                    --pull-request=${{github.event.pull_request.number}} \
                                    --behavior=update
         env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-      
+          INFRACOST_GITHUB_ACTION: ${{ secrets.INFRACOST_API_KEY }}
       
   apply:
     name: Deployment
