@@ -24,9 +24,9 @@ on:
       AWS_REGION:
         required: true
       GIT_PIPE_TOKEN:
-        required: false
+        required: true
       INFRACOST_API_KEY:
-        required: false
+        required: true
 
 jobs:
   lint:
@@ -121,7 +121,7 @@ jobs:
                                    --pull-request=${{github.event.pull_request.number}} \
                                    --behavior=update
         env:
-          INFRACOST_GITHUB_ACTION: ${{ secrets.INFRACOST_API_KEY }}
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
       
   apply:
     name: Deployment
