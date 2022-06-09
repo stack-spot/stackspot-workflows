@@ -23,6 +23,10 @@ on:
         required: true
       AWS_REGION:
         required: true
+      GIT_PIPE_TOKEN:
+        required: false
+      INFRACOST_API_KEY:
+        required: false
 
 jobs:
   lint:
